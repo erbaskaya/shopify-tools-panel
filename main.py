@@ -17,10 +17,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse, PlainTextResponse
 # ENV AYARLARI
 # Render > Environment Variables alanına ekle:
 # SHOP_DOMAIN=bzjwyw-jv.myshopify.com
-# SHOPIFY_ACCESS_TOKEN=shpat_xxx
+# SHOPIFY_ACCESS_TOKEN=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
 # API_VERSION=2026-04
-# PANEL_PASSWORD=senin_sifren
-# SECRET_KEY=rastgele_uzun_bir_metin
+# PANEL_PASSWORD=Erbaskaya1120+-
+# SECRET_KEY=erbaskayashopifytoolsrestory
 # =========================
 
 SHOP_DOMAIN = os.getenv("SHOP_DOMAIN", "").strip()
