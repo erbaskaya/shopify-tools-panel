@@ -1,0 +1,3 @@
+handle;title;body_html;vendor;product_type;tags;status;option1_name;option1_value;option2_name;option2_value;sku;price;compare_at_price;barcode;inventory_quantity;cost;image_src
+ornek-urun;Örnek Ürün;<p>Ürün açıklaması</p>;Marka A;Kategori A;Tag1, Tag2;active;Renk;Siyah;Beden;M;SKU-001;19,90;24,90;1234567890123;5;10,50;https://example.com/image1.jpg
+ornek-urun;Örnek Ürün;<p>Ürün açıklaması</p>;Marka A;Kategori A;Tag1, Tag2;active;Renk;Beyaz;Beden;M;SKU-002;19,90;24,90;1234567890124;5;10,50;https://example.com/image1.jpg

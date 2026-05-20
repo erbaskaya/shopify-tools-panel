@@ -1,30 +1,30 @@
-# Shopify Tools Panel V2
+# Shopify Tools Panel V3
 
-Bu sürüm modüler yapıya çevrilmiştir.
+Bu sürümde panelde import/export araçları eklendi.
 
-## Klasör yapısı
+## Araçlar
 
-```text
-shopify-tools-panel/
-├── main.py
-├── requirements.txt
-├── render.yaml
-├── core/
-│   ├── __init__.py
-│   ├── auth.py
-│   ├── config.py
-│   ├── job_manager.py
-│   └── shopify_client.py
-└── actions/
-    ├── __init__.py
-    ├── stock_update.py
-    ├── category_sync.py
-    └── example_new_action.py
-```
+1. Ürün import
+2. Manuel ve smart kategori import
+3. Menü export
+4. Menü import
+5. Blog import
+6. Vendor import
+
+Ayrıca önceki araçlar korunur:
+
+- Tüm varyant stoklarını ayarla
+- Alt kategori ürünlerini üst kategorilere ekle
+
+## Önemli
+
+Render sunucusu senin bilgisayarındaki `C:\...` veya `D:\...` dosya yolunu okuyamaz. Bu yüzden import için panelde **dosya seçme butonu** kullanılır.
+
+Export işleminde dosya Render üzerinde oluşturulur ve işlem sayfasında **indir** butonu çıkar. Ona basınca dosya PC'ye iner.
 
 ## Render ayarları
 
-Render'daki ayarların aynı kalabilir:
+Ayarların aynı kalabilir:
 
 ```text
 Build Command:
@@ -36,67 +36,102 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
 
 ## Environment Variables
 
-Render > Environment Variables alanında bunlar olmalı:
-
 ```text
 SHOP_DOMAIN=bzjwyw-jv.myshopify.com
 SHOPIFY_ACCESS_TOKEN=yeni_shopify_token
 API_VERSION=2026-04
 PANEL_PASSWORD=panel_giris_sifren
 SECRET_KEY=rastgele_uzun_bir_metin
-```
-
-Opsiyonel:
-
-```text
 COOKIE_SECURE=true
 ```
 
-Render üzerinde `COOKIE_SECURE=true` kalsın. Lokal bilgisayarda HTTP ile test edeceksen `COOKIE_SECURE=false` yapabilirsin.
+## Gerekli Shopify izinleri
 
-## Yeni işlem nasıl eklenir?
-
-Örnek:
+Custom app token içinde ihtiyaca göre şu izinler olmalı:
 
 ```text
-actions/sale_add.py
+read_products
+write_products
+read_inventory
+write_inventory
+read_locations
+read_online_store_navigation
+write_online_store_navigation
+read_content
+write_content
 ```
 
-dosyasını oluştur.
+## CSV şablonları
 
-İçinde standart fonksiyon şöyle olmalı:
+`sample_templates/` klasörü içinde örnek CSV dosyaları vardır.
 
-```python
-def run(job_id, dry_run):
-    ...
+CSV dosyaları Türkçe Excel için `;` ayırıcıyla hazırlandı. Sistem `;`, `,`, `|` ve tab ayırıcıları okumaya çalışır.
+
+## Ürün import kolonları
+
+```text
+handle;title;body_html;vendor;product_type;tags;status;option1_name;option1_value;option2_name;option2_value;sku;price;compare_at_price;barcode;inventory_quantity;cost;image_src
 ```
 
-Sonra `main.py` içine import ekle:
+Aynı `handle` birden fazla satırda varsa bu satırlar ürünün varyantları olarak işlenir.
 
-```python
-from actions.sale_add import run as run_sale_add
+## Kategori import kolonları
+
+```text
+type;title;handle;body_html;rule_tag;product_handles;image_src;published
 ```
 
-Dashboard'a yeni kart/form ekle.
+`type` değeri:
 
-Route ekle:
-
-```python
-@app.post("/actions/sale-add")
-def start_sale_add(request: Request, dry_run: str = Form(None)):
-    redirect = require_login(request)
-    if redirect:
-        return redirect
-
-    dry = dry_run == "1"
-    job_id = create_job("Sale ekleme - TEST" if dry else "Sale ekleme")
-    run_thread(run_sale_add, job_id, dry)
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+```text
+manual
+smart
 ```
 
-## Mevcut işlemler
+Smart kategoride otomatik kural şu şekilde kurulur:
 
-1. Tüm varyant stoklarını istenen değere çekme
-2. Menü hiyerarşisine göre alt koleksiyon ürünlerini üst koleksiyonlara ekleme
+```text
+Product tag equals rule_tag
+```
 
-Her iki işlemde de test modu vardır.
+`rule_tag` boşsa kategori başlığı kullanılır.
+
+## Menü export/import
+
+En güvenli kullanım:
+
+1. Menü export al
+2. Dosyayı düzenle
+3. Menü import ile tekrar yükle
+
+Menü import CSV kolonları:
+
+```text
+level;position;parent_path;title;type;url;resource_id;resource_handle;resource_title
+```
+
+## Blog import kolonları
+
+```text
+blog_handle;blog_title;title;handle;author;tags;body_html;summary_html;published;image_src
+```
+
+## Vendor import kolonları
+
+Ürünü bulmak için şu alanlardan biri yeterlidir:
+
+```text
+product_id
+handle
+sku
+```
+
+Vendor alanı:
+
+```text
+vendor
+```
+
+## Yeni işlem ekleme
+
+Yeni işlem kodunu `actions/` klasörüne ayrı dosya olarak ekle. Sonra `main.py` içine yeni form ve route ekle.

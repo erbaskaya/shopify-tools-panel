@@ -1,0 +1,2 @@
+blog_handle;blog_title;title;handle;author;tags;body_html;summary_html;published;image_src
+news;Blog;İlk Blog Yazısı;ilk-blog-yazisi;Admin;haber, test;<p>Blog içeriği</p>;<p>Kısa özet</p>;true;https://example.com/blog.jpg

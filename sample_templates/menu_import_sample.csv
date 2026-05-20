@@ -1,0 +1,4 @@
+level;position;parent_path;title;type;url;resource_id;resource_handle;resource_title
+1;1;;Ana Sayfa;HTTP;/;;;
+1;2;;Manuel Kategori;COLLECTION;;;manuel-kategori;Manuel Kategori
+2;1;Manuel Kategori;Alt Link;HTTP;/collections/manuel-kategori;;;
