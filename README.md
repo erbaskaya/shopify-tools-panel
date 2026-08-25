@@ -197,3 +197,7 @@ dist\ShopifyToolsPanel.exe
 ```
 
 Yerel kullanımda `.env` dosyası `.env.example` üzerinden hazırlanabilir. `python-dotenv` ile otomatik okunur.
+
+## Modern Sidebar UI
+
+Panel arayuzu profesyonel yonetim paneli duzenine gecirildi: solda sabit navigasyon, sagda icerik alani, dashboard KPI kartlari, modern formlar ve Sale workflow ekrani. Bu degisiklik islevsel endpointleri degistirmez.
