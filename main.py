@@ -219,7 +219,7 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
         source = getattr(store, 'source', 'env')
         source_badge = '<span class="pill status-done">Panel</span>' if source == 'panel' else '<span class="pill">ENV</span>'
         if source == 'panel':
-            actions = f'''<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+            actions = f'''<div class="store-actions-inner">
                 <a class="btn btn-light btn-inline" href="/stores?edit={e(store.key)}">Düzenle</a>
                 <form method="post" action="/stores/{e(store.key)}/test"><button class="btn btn-light btn-inline" type="submit">Bağlantı Testi</button></form>
                 <form method="post" action="/stores/{e(store.key)}/delete" onsubmit="return confirm('Bu mağaza panelden silinsin mi?')"><button class="btn btn-danger btn-inline" type="submit">Sil</button></form>
@@ -227,11 +227,12 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
         else:
             actions = '<span class="muted small">Environment Variable üzerinden tanımlı</span>'
         rows.append(f'''<div class="store-manage-row">
-            <div><div class="product-title">{e(store.name)}</div><div class="muted small">{e(store.domain)}</div></div>
-            <div><code>{e(store.key)}</code></div>
-            <div>{source_badge}</div>
-            <div class="muted small">{e(store.api_version)}</div>
-            <div>{actions}</div>
+            <div class="store-info">
+                <div class="product-title">{e(store.name)}</div>
+                <div class="muted small store-domain">{e(store.domain)}</div>
+                <div class="store-meta"><code>{e(store.key)}</code>{source_badge}<span class="store-api">API {e(store.api_version)}</span></div>
+            </div>
+            <div class="store-row-actions">{actions}</div>
         </div>''')
     store_rows = ''.join(rows) or '<div class="hint">Henüz mağaza tanımlı değil.</div>'
 
@@ -266,9 +267,7 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
             # Tıklanabilir tutuyoruz; POST route kalıcı depolama yoksa anlaşılır hata mesajı döndürüyor.
             import_button = 'ENV Mağazalarını İçe Aktar'
             import_note = 'Şu anda kalıcı veritabanı bağlı değil. Tıklarsanız neden aktarılamadığını açıkça göstereceğiz.'
-        import_env = f'''<div class="card" style="margin-top:12px"><div class="card-header"><div><h2>ENV Mağazalarını Panele Taşı</h2><p>Mevcut SHOPIFY_STORES_JSON içindeki {len(env_stores)} mağazayı yönetilebilir mağaza kayıtlarına kopyalar.</p></div><span class="card-icon">⇢</span></div>
-        <form method="post" action="/stores/import-env"><button>{import_button}</button></form>
-        <p class="small muted">{e(import_note)}</p></div>'''
+        import_env = f'''<div class="card store-span-2 env-import-card"><div class="env-import-main"><div><div class="card-header compact-header"><div><h2>ENV Mağazalarını Panele Taşı</h2><p>Mevcut SHOPIFY_STORES_JSON içindeki {len(env_stores)} mağazayı yönetilebilir mağaza kayıtlarına kopyalar.</p></div><span class="card-icon">⇢</span></div><p class="small muted env-import-note">{e(import_note)}</p></div><form method="post" action="/stores/import-env"><button class="btn-inline">{import_button}</button></form></div></div>'''
 
     status_msg = f'''<div class="flash-toast flash-success" id="flashToast"><div class="flash-icon">✓</div><div><b>YAPILDI</b><span>{e(msg)}</span></div><button type="button" onclick="this.parentElement.remove()">×</button></div>''' if msg else ''
     error_msg = f'''<div class="flash-toast flash-error" id="flashToast"><div class="flash-icon">!</div><div><b>İŞLEM YAPILMADI</b><span>{e(error)}</span></div><button type="button" onclick="this.parentElement.remove()">×</button></div>''' if error else ''
@@ -276,19 +275,16 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
 
     body = f'''
 <style>
-.store-manage-grid{{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:14px;align-items:start}}
-.store-manage-row{{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(100px,.7fr) 70px 90px minmax(210px,1fr);gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}}
-.store-manage-row:last-child{{border-bottom:0}}code{{font-size:12px;background:#f4f4f5;padding:4px 7px;border-radius:7px}}.token-note{{font-size:12px;color:var(--muted);margin-top:6px}}
+.store-manage-grid{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}}
+.store-manage-row{{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}}
+.store-manage-row:last-child{{border-bottom:0}}.store-domain{{margin-top:2px}}.store-meta{{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}}.store-api{{font-size:10px;color:#667085;background:#f8fafc;border:1px solid #eaecf0;border-radius:999px;padding:4px 7px}}.store-row-actions{{min-width:0}}.store-actions-inner{{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap}}.store-actions-inner form{{margin:0}}.store-actions-inner .btn{{margin-top:0;min-height:32px;padding:6px 9px}}code{{font-size:11px;background:#f4f4f5;padding:4px 7px;border-radius:7px}}.token-note{{font-size:11px;color:var(--muted);margin-top:5px}}.store-span-2{{grid-column:1 / -1}}.env-import-card{{padding:12px 14px}}.env-import-main{{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}}.compact-header{{margin-bottom:0}}.env-import-note{{margin:4px 0 0!important}}.env-import-main form{{margin:0}}.env-import-main form button{{margin:0;white-space:nowrap}}
 .flash-toast{{position:fixed;top:18px;right:22px;z-index:9999;min-width:360px;max-width:520px;padding:14px 15px;border-radius:12px;display:grid;grid-template-columns:34px 1fr 24px;gap:10px;align-items:center;box-shadow:0 18px 45px rgba(16,24,40,.18);border:1px solid}}.flash-toast .flash-icon{{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:16px}}.flash-toast b{{display:block;font-size:12px;letter-spacing:.04em;margin-bottom:2px}}.flash-toast span{{display:block;font-size:12px;line-height:1.45}}.flash-toast button{{margin:0;padding:0;width:24px;height:24px;background:transparent;color:inherit;font-size:20px;font-weight:500}}.flash-success{{background:#ecfdf3;color:#067647;border-color:#abefc6}}.flash-success .flash-icon{{background:#d1fadf;color:#067647}}.flash-error{{background:#fff4ed;color:#b42318;border-color:#fecdca}}.flash-error .flash-icon{{background:#fee4e2;color:#b42318}}
-@media(max-width:1050px){{.store-manage-grid{{grid-template-columns:1fr}}.store-manage-row{{grid-template-columns:1fr 1fr;align-items:start}}}}@media(max-width:620px){{.flash-toast{{left:12px;right:12px;top:12px;min-width:0}}}}
+@media(max-width:900px){{.store-manage-grid{{grid-template-columns:1fr}}.store-span-2{{grid-column:auto}}.env-import-main{{grid-template-columns:1fr}}.env-import-main form button{{width:100%!important}}}}@media(max-width:620px){{.store-manage-row{{grid-template-columns:1fr;align-items:start}}.store-actions-inner{{justify-content:flex-start}}.flash-toast{{left:12px;right:12px;top:12px;min-width:0}}}}
 </style>
 <div class="page-heading"><div><span class="eyebrow">AYARLAR</span><h1>Mağaza Yönetimi</h1><p>Shopify mağazalarını panelden ekleyin, düzenleyin, test edin ve silin.</p></div><span class="pill status-done">Depolama: {e(storage)}</span></div>
 {status_msg}{error_msg}{write_warning}
 <div class="store-manage-grid">
-  <div>
-    <div class="card"><div class="card-header"><div><h2>Bağlı Mağazalar</h2><p>Sale ve diğer çoklu mağaza işlemlerinde bu liste kullanılır.</p></div><span class="card-icon">{len(stores)}</span></div>{store_rows}</div>
-    {import_env}
-  </div>
+  <div class="card"><div class="card-header"><div><h2>Bağlı Mağazalar</h2><p>Sale ve diğer çoklu mağaza işlemlerinde bu liste kullanılır.</p></div><span class="card-icon">{len(stores)}</span></div>{store_rows}</div>
   <div class="card"><div class="card-header"><div><h2>{form_title}</h2><p>Token tarayıcıya geri gösterilmez ve panel kayıtlarında şifreli saklanır.</p></div><span class="card-icon">＋</span></div>
     <form method="post" action="/stores/save">
       <label>Mağaza adı</label><input type="text" name="name" value="{e(name_value)}" placeholder="HAUSONE" required {form_disabled}>
@@ -299,6 +295,7 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
       <button type="submit" {form_disabled}>Kaydet</button>{cancel}
     </form>
   </div>
+  {import_env}
 </div>'''
     return layout('Mağaza Yönetimi', body, request)
 
@@ -419,22 +416,25 @@ def sale_page(request: Request, source_store: str = '', q: str = ''):
 </div>
 <div class="alert ok"><b>Smart Collection modu:</b> Panel kategori üyeliğine müdahale etmez. İndirimde mevcut satış fiyatı Compare-at Price alanına taşınır; geri almada Compare-at tekrar satış fiyatı olur ve alan temizlenir.</div>
 {load_alert}
-<div class="card" style="margin-bottom:16px">
-  <div class="card-header"><div><h2>Referans Mağaza ve Ürün Arama</h2><p>Filtre seçeneklerini hangi mağazadan okuyacağınızı belirleyin.</p></div><span class="card-icon">⌕</span></div>
-  <form method="get" action="/sale"><div class="two-col"><div><label>Referans mağaza</label><select name="source_store">{store_options}</select></div><div><label>Ürün ara</label><input type="text" name="q" value="{e(q)}" placeholder="Ürün adı, handle veya SKU"></div></div><button class="btn-light">Listeyi Yenile / Ara</button></form>
-</div>
-<form method="post" action="/actions/sale" id="saleForm">
-  <div class="workflow-grid">
+<style>
+.sale-card-grid{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}}.sale-form-grid{{display:contents}}.sale-card-grid>.card,.sale-form-grid>.card{{margin:0;min-width:0}}.sale-card-grid .step-card{{height:100%}}.sale-card-grid .product-list{{max-height:310px}}.sale-action-card{{display:flex;flex-direction:column}}.sale-action-card .sale-submit{{margin-top:auto;padding-top:8px}}.sale-reference-card form>button{{margin-top:10px}}
+@media(max-width:820px){{.sale-card-grid{{grid-template-columns:1fr}}.sale-form-grid{{display:contents}}}}
+</style>
+<div class="sale-card-grid">
+  <div class="card sale-reference-card">
+    <div class="card-header"><div><h2>Referans Mağaza ve Ürün Arama</h2><p>Filtre seçeneklerini hangi mağazadan okuyacağınızı belirleyin.</p></div><span class="card-icon">⌕</span></div>
+    <form method="get" action="/sale"><div class="two-col"><div><label>Referans mağaza</label><select name="source_store">{store_options}</select></div><div><label>Ürün ara</label><input type="text" name="q" value="{e(q)}" placeholder="Ürün adı, handle veya SKU"></div></div><button class="btn-light">Listeyi Yenile / Ara</button></form>
+  </div>
+  <form method="post" action="/actions/sale" id="saleForm" class="sale-form-grid">
     <div class="card step-card"><span class="step-number">1</span><h2>Hedef Mağazalar</h2><p>İşlemin uygulanacağı mağazaları seçin.</p><div class="store-box">{target_checks}</div></div>
-    <div class="card step-card"><span class="step-number">2</span><h2>İşlem ve Oran</h2><p>İndirim uygulayın veya mevcut indirimi geri alın.</p><label>İşlem tipi</label><select name="operation" id="operation"><option value="apply">İndirim uygula</option><option value="restore">İndirimi kaldır</option></select><div id="discountBox"><label>İndirim yüzdesi</label><input type="number" name="discount_percent" value="20" min="0.01" max="99.99" step="0.01"></div><label class="check-row"><input type="checkbox" name="dry_run" value="1" checked> Önce test modu (önerilir)</label></div>
-  </div>
-  <div class="card step-card" style="margin-top:16px"><span class="step-number">3</span><h2>Ürün Seçim Yöntemi</h2><p>İşlemin kapsamını kategori, marka veya ürün seçimiyle belirleyin.</p><label>Filtre tipi</label><select name="filter_mode" id="filterMode"><option value="collection">Kategoriye göre</option><option value="vendor">Satıcı / markaya göre</option><option value="products">Tek tek ürün seç</option></select>
-    <div id="filter-collection" class="filter-section active"><label>Kategori</label><select name="collection_handle"><option value="">Kategori seçin</option>{collection_options}</select></div>
-    <div id="filter-vendor" class="filter-section"><label>Satıcı / Marka</label><select name="vendor"><option value="">Satıcı / marka seçin</option>{vendor_options}</select></div>
-    <div id="filter-products" class="filter-section"><label>Ürünler</label><div class="product-list">{products_html}</div><p class="small">En fazla 50 arama sonucu gösterilir. Başka ürünler için üstteki ürün aramasını kullanın.</p></div>
-    <button type="submit">İşlemi Başlat</button>
-  </div>
-</form>
+    <div class="card step-card"><span class="step-number">2</span><h2>Ürün Seçim Yöntemi</h2><p>İşlemin kapsamını kategori, marka veya ürün seçimiyle belirleyin.</p><label>Filtre tipi</label><select name="filter_mode" id="filterMode"><option value="collection">Kategoriye göre</option><option value="vendor">Satıcı / markaya göre</option><option value="products">Tek tek ürün seç</option></select>
+      <div id="filter-collection" class="filter-section active"><label>Kategori</label><select name="collection_handle"><option value="">Kategori seçin</option>{collection_options}</select></div>
+      <div id="filter-vendor" class="filter-section"><label>Satıcı / Marka</label><select name="vendor"><option value="">Satıcı / marka seçin</option>{vendor_options}</select></div>
+      <div id="filter-products" class="filter-section"><label>Ürünler</label><div class="product-list">{products_html}</div><p class="small">En fazla 50 arama sonucu gösterilir. Başka ürünler için üstteki ürün aramasını kullanın.</p></div>
+    </div>
+    <div class="card step-card sale-action-card"><span class="step-number">3</span><h2>İşlem ve Oran</h2><p>İndirim uygulayın veya mevcut indirimi geri alın.</p><label>İşlem tipi</label><select name="operation" id="operation"><option value="apply">İndirim uygula</option><option value="restore">İndirimi kaldır</option></select><div id="discountBox"><label>İndirim yüzdesi</label><input type="number" name="discount_percent" value="20" min="0.01" max="99.99" step="0.01"></div><label class="check-row"><input type="checkbox" name="dry_run" value="1" checked> Önce test modu (önerilir)</label><div class="sale-submit"><button type="submit">İşlemi Başlat</button></div></div>
+  </form>
+</div>
 <script>
 (function(){{
   const filterMode=document.getElementById('filterMode');
