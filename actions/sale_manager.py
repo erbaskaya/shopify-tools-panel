@@ -7,8 +7,6 @@ from core.job_manager import finish_job, log
 from core.shopify_client import ShopifyClient
 
 MONEY_STEP = Decimal('0.01')
-SALE_HANDLE = 'sale'
-
 
 def money(value):
     try:
@@ -79,53 +77,6 @@ def select_products(client, filter_mode, filter_value, product_handles):
     raise Exception(f'Geçersiz filtre tipi: {filter_mode}')
 
 
-def get_sale_collection(client):
-    collection = client.find_collection_by_handle(SALE_HANDLE)
-    if not collection:
-        raise Exception('collections/sale kategorisi bulunamadı.')
-    if collection.get('_collection_kind') != 'manual':
-        raise Exception('collections/sale bir manuel (custom) kategori olmalı. Smart kategoriye elle ürün eklenemez/çıkarılamaz.')
-    return collection
-
-
-def collect_membership(client, collection_id, product_id):
-    response = client.rest_request(
-        'GET',
-        f'/collects.json?collection_id={collection_id}&product_id={product_id}&limit=10',
-    )
-    return response.json().get('collects', [])
-
-
-def add_to_sale(job_id, client, collection_id, product, dry_run):
-    memberships = collect_membership(client, collection_id, product['id'])
-    if memberships:
-        log(job_id, f'KATEGORİ: zaten Sale içinde | {product.get("title")}')
-        return False
-    if dry_run:
-        log(job_id, f'TEST KATEGORİ: Sale kategorisine eklenecekti | {product.get("title")}')
-        return True
-    client.rest_request(
-        'POST',
-        '/collects.json',
-        json={'collect': {'product_id': product['id'], 'collection_id': collection_id}},
-    )
-    log(job_id, f'KATEGORİ OK: Sale kategorisine eklendi | {product.get("title")}')
-    return True
-
-
-def remove_from_sale(job_id, client, collection_id, product, dry_run):
-    memberships = collect_membership(client, collection_id, product['id'])
-    if not memberships:
-        log(job_id, f'KATEGORİ: Sale içinde değil | {product.get("title")}')
-        return False
-    if dry_run:
-        log(job_id, f'TEST KATEGORİ: Sale kategorisinden çıkarılacaktı | {product.get("title")}')
-        return True
-    for membership in memberships:
-        client.rest_request('DELETE', f'/collects/{membership["id"]}.json')
-    log(job_id, f'KATEGORİ OK: Sale kategorisinden çıkarıldı | {product.get("title")}')
-    return True
-
 
 def apply_variant_discount(job_id, client, product, variant, discount_percent, dry_run):
     variant_id = variant.get('id')
@@ -194,7 +145,6 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
 
     client = ShopifyClient(job_id, store=store)
     log(job_id, f'===== MAĞAZA: {store.name} | {store.domain} =====')
-    sale_collection = get_sale_collection(client)
     products = select_products(client, filter_mode, filter_value, product_handles)
     log(job_id, f'Seçilen ürün sayısı: {len(products)}')
 
@@ -202,7 +152,6 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
         'products': len(products),
         'variant_updated': 0,
         'variant_skipped': 0,
-        'collection_changed': 0,
         'errors': 0,
     }
 
@@ -219,12 +168,6 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
                     stats['variant_skipped'] += 1
                 time.sleep(0.08)
 
-            if operation == 'apply':
-                changed = add_to_sale(job_id, client, sale_collection['id'], product, dry_run)
-            else:
-                changed = remove_from_sale(job_id, client, sale_collection['id'], product, dry_run)
-            if changed:
-                stats['collection_changed'] += 1
         except Exception as exc:
             stats['errors'] += 1
             log(job_id, f'HATA ÜRÜN: {product.get("title")} | {exc}')
@@ -235,7 +178,6 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
         f'products={stats["products"]} '
         f'variant_updated={stats["variant_updated"]} '
         f'variant_skipped={stats["variant_skipped"]} '
-        f'collection_changed={stats["collection_changed"]} '
         f'errors={stats["errors"]}',
     )
     return stats

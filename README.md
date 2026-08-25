@@ -155,7 +155,7 @@ price = 80.00
 compare_at_price = 100.00
 ```
 
-Ürün ayrıca `/collections/sale` kategorisine eklenir. `sale` kategorisi manuel/custom collection olmalıdır.
+`/collections/sale` koleksiyonu smart/otomatik koleksiyon olarak kabul edilir. Panel koleksiyona ürün eklemez; Compare-at Price kuralına göre Shopify ürünü otomatik olarak Sale koleksiyonuna alır.
 
 Zaten `compare_at_price` değeri bulunan varyantlara ikinci kez indirim bindirilmez.
 
@@ -168,7 +168,7 @@ price = compare_at_price
 compare_at_price = boş
 ```
 
-ve ürün `/collections/sale` kategorisinden çıkarılır.
+ve Compare-at Price temizlendiğinde Shopify smart collection kuralına göre ürün Sale koleksiyonundan otomatik çıkar.
 
 ### Çoklu mağaza ayarı
 

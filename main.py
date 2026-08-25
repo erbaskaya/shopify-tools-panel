@@ -102,7 +102,7 @@ def dashboard(request: Request):
         jobs = f'<div class="card" style="margin-top:18px"><h2>Son İşlemler</h2><div class="jobs-list">{"".join(items)}</div></div>'
     body = f'''
 <h1>Shopify İşlem Paneli</h1>{cfg}
-<div class="card sale-card" style="margin-bottom:18px"><h2>Sale / İndirim Yönetimi</h2><p>Kategori, satıcı/marka veya tek tek ürün seçerek indirim uygula; ürünleri <b>collections/sale</b> kategorisine ekle. İstersen aynı filtrelerle işlemi tersine çevir.</p><a class="btn" href="/sale">Sale Yönetimini Aç</a></div>
+<div class="card sale-card" style="margin-bottom:18px"><h2>Sale / İndirim Yönetimi</h2><p>Kategori, satıcı/marka veya tek tek ürün seçerek indirim uygula. <b>Sale koleksiyonu otomatik (smart collection)</b> olduğu için panel kategori üyeliğine müdahale etmez; yalnızca fiyat ve karşılaştırmalı fiyat alanlarını günceller.</p><a class="btn" href="/sale">Sale Yönetimini Aç</a></div>
 <div class="alert">Sunucu bilgisayarındaki <b>C:\\...</b> veya <b>D:\\...</b> dosya yolunu okuyamaz. Import için dosya seçme butonunu kullan.</div>
 <h3>Hızlı Araçlar</h3><div class="grid">
 <div class="card"><h2>Tüm Varyant Stoklarını Ayarla</h2><p>Tüm varyant stoklarını seçtiğin değere çeker.</p><form method="post" action="/actions/stocks"><label>Hedef stok miktarı</label><input type="number" name="stock_value" value="5" min="0" required><label class="check-row"><input type="checkbox" name="dry_run" value="1" checked> Test modu</label><button>Stok İşlemini Başlat</button></form></div>
@@ -172,13 +172,13 @@ def sale_page(request: Request, source_store: str = '', q: str = ''):
 
     body = f'''
 <h1>Sale / İndirim Yönetimi</h1>
-<div class="alert ok"><b>İşleyiş:</b> İndirim uygulamada mevcut satış fiyatı karşılaştırmalı fiyata taşınır. Örn. 100,00 € + %20 → <b>Price 80,00 €</b>, <b>Compare-at 100,00 €</b>. Geri almada Compare-at tekrar Price olur ve Compare-at temizlenir.</div>
+<div class="alert ok"><b>İşleyiş:</b> İndirim uygulamada mevcut satış fiyatı karşılaştırmalı fiyata taşınır. Örn. 100,00 € + %20 → <b>Price 80,00 €</b>, <b>Compare-at 100,00 €</b>. Geri almada Compare-at tekrar Price olur ve Compare-at temizlenir. <b>Sale koleksiyonu smart collection olduğu için ürün ekleme/çıkarma işlemini Shopify otomatik yapar.</b></div>
 {load_alert}
 <div class="card" style="margin-bottom:18px"><h2>Filtre verilerini hangi mağazadan gösterelim?</h2><form method="get" action="/sale"><div class="two-col"><div><label>Referans mağaza</label><select name="source_store">{store_options}</select></div><div><label>Ürün ara</label><input type="text" name="q" value="{e(q)}" placeholder="Ürün adı, handle veya SKU"></div></div><button class="btn-light">Listeyi Yenile / Ara</button></form><p class="small">Seçtiğiniz kategori handle'ı, vendor adı veya ürün handle'ları hedef mağazalarda eşleştirilir.</p></div>
 <form method="post" action="/actions/sale" id="saleForm">
 <div class="grid">
 <div class="card"><h2>1. Hedef Mağazalar</h2><div class="store-box">{target_checks}</div><p class="small">Birden fazla mağazaya aynı işlem tek seferde uygulanabilir.</p></div>
-<div class="card"><h2>2. İşlem</h2><label>İşlem tipi</label><select name="operation" id="operation"><option value="apply">İndirim uygula + Sale kategorisine ekle</option><option value="restore">İndirimi kaldır + Sale kategorisinden çıkar</option></select><div id="discountBox"><label>İndirim yüzdesi</label><input type="number" name="discount_percent" value="20" min="0.01" max="99.99" step="0.01"></div><label class="check-row"><input type="checkbox" name="dry_run" value="1" checked> Önce test modu (önerilir)</label></div>
+<div class="card"><h2>2. İşlem</h2><label>İşlem tipi</label><select name="operation" id="operation"><option value="apply">İndirim uygula</option><option value="restore">İndirimi kaldır</option></select><div id="discountBox"><label>İndirim yüzdesi</label><input type="number" name="discount_percent" value="20" min="0.01" max="99.99" step="0.01"></div><label class="check-row"><input type="checkbox" name="dry_run" value="1" checked> Önce test modu (önerilir)</label></div>
 </div>
 <div class="card" style="margin-top:18px"><h2>3. Ürünleri Nasıl Seçeceğiz?</h2><label>Filtre tipi</label><select name="filter_mode" id="filterMode"><option value="collection">Kategoriye göre</option><option value="vendor">Satıcı / markaya göre</option><option value="products">Tek tek ürün seç</option></select>
 <div id="filter-collection" class="filter-section active"><label>Kategori</label><select name="collection_handle"><option value="">Kategori seçin</option>{collection_options}</select></div>
