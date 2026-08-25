@@ -258,13 +258,20 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
 
     import_env = ''
     if env_stores:
-        disabled = 'disabled' if not persistent else ''
+        if persistent:
+            import_button = 'ENV Mağazalarını İçe Aktar'
+            import_note = "Aktarım başarılı olduktan sonra Vercel'deki SHOPIFY_STORES_JSON değişkenini kaldırabilirsiniz."
+        else:
+            # Butonu tamamen pasif bırakmak kullanıcıya hiçbir geri bildirim vermiyordu.
+            # Tıklanabilir tutuyoruz; POST route kalıcı depolama yoksa anlaşılır hata mesajı döndürüyor.
+            import_button = 'ENV Mağazalarını İçe Aktar'
+            import_note = 'Şu anda kalıcı veritabanı bağlı değil. Tıklarsanız neden aktarılamadığını açıkça göstereceğiz.'
         import_env = f'''<div class="card" style="margin-top:12px"><div class="card-header"><div><h2>ENV Mağazalarını Panele Taşı</h2><p>Mevcut SHOPIFY_STORES_JSON içindeki {len(env_stores)} mağazayı yönetilebilir mağaza kayıtlarına kopyalar.</p></div><span class="card-icon">⇢</span></div>
-        <form method="post" action="/stores/import-env"><button {disabled}>ENV Mağazalarını İçe Aktar</button></form>
-        <p class="small muted">Aktarım başarılı olduktan sonra Vercel'deki SHOPIFY_STORES_JSON değişkenini kaldırabilirsiniz.</p></div>'''
+        <form method="post" action="/stores/import-env"><button>{import_button}</button></form>
+        <p class="small muted">{e(import_note)}</p></div>'''
 
-    status_msg = f'<div class="alert ok">{e(msg)}</div>' if msg else ''
-    error_msg = f'<div class="alert">{e(error)}</div>' if error else ''
+    status_msg = f'''<div class="flash-toast flash-success" id="flashToast"><div class="flash-icon">✓</div><div><b>YAPILDI</b><span>{e(msg)}</span></div><button type="button" onclick="this.parentElement.remove()">×</button></div>''' if msg else ''
+    error_msg = f'''<div class="flash-toast flash-error" id="flashToast"><div class="flash-icon">!</div><div><b>İŞLEM YAPILMADI</b><span>{e(error)}</span></div><button type="button" onclick="this.parentElement.remove()">×</button></div>''' if error else ''
     cancel = '<a class="btn btn-light btn-inline" href="/stores">Vazgeç</a>' if managed else ''
 
     body = f'''
@@ -272,7 +279,8 @@ def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''
 .store-manage-grid{{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:14px;align-items:start}}
 .store-manage-row{{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(100px,.7fr) 70px 90px minmax(210px,1fr);gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}}
 .store-manage-row:last-child{{border-bottom:0}}code{{font-size:12px;background:#f4f4f5;padding:4px 7px;border-radius:7px}}.token-note{{font-size:12px;color:var(--muted);margin-top:6px}}
-@media(max-width:1050px){{.store-manage-grid{{grid-template-columns:1fr}}.store-manage-row{{grid-template-columns:1fr 1fr;align-items:start}}}}
+.flash-toast{{position:fixed;top:18px;right:22px;z-index:9999;min-width:360px;max-width:520px;padding:14px 15px;border-radius:12px;display:grid;grid-template-columns:34px 1fr 24px;gap:10px;align-items:center;box-shadow:0 18px 45px rgba(16,24,40,.18);border:1px solid}}.flash-toast .flash-icon{{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:16px}}.flash-toast b{{display:block;font-size:12px;letter-spacing:.04em;margin-bottom:2px}}.flash-toast span{{display:block;font-size:12px;line-height:1.45}}.flash-toast button{{margin:0;padding:0;width:24px;height:24px;background:transparent;color:inherit;font-size:20px;font-weight:500}}.flash-success{{background:#ecfdf3;color:#067647;border-color:#abefc6}}.flash-success .flash-icon{{background:#d1fadf;color:#067647}}.flash-error{{background:#fff4ed;color:#b42318;border-color:#fecdca}}.flash-error .flash-icon{{background:#fee4e2;color:#b42318}}
+@media(max-width:1050px){{.store-manage-grid{{grid-template-columns:1fr}}.store-manage-row{{grid-template-columns:1fr 1fr;align-items:start}}}}@media(max-width:620px){{.flash-toast{{left:12px;right:12px;top:12px;min-width:0}}}}
 </style>
 <div class="page-heading"><div><span class="eyebrow">AYARLAR</span><h1>Mağaza Yönetimi</h1><p>Shopify mağazalarını panelden ekleyin, düzenleyin, test edin ve silin.</p></div><span class="pill status-done">Depolama: {e(storage)}</span></div>
 {status_msg}{error_msg}{write_warning}
@@ -343,10 +351,14 @@ def stores_import_env(request: Request):
     if red:
         return red
     try:
+        if not writes_are_persistent():
+            raise Exception('AKTARIM YAPILMADI: Vercel üzerinde kalıcı veritabanı bağlı değil. Önce DATABASE_URL tanımlayın; mevcut ENV mağazaları çalışmaya devam ediyor.')
         items = get_env_stores()
+        if not items:
+            raise Exception('Aktarılacak ENV mağazası bulunamadı.')
         for store in items:
             upsert_managed_store(store.key, store.name, store.domain, store.token, store.api_version, True)
-        return RedirectResponse('/stores?msg=' + quote(f'{len(items)} mağaza panele aktarıldı.'), status_code=303)
+        return RedirectResponse('/stores?msg=' + quote(f'{len(items)} mağaza panele başarıyla aktarıldı.'), status_code=303)
     except Exception as exc:
         return RedirectResponse('/stores?error=' + quote(str(exc)), status_code=303)
 
