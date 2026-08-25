@@ -32,7 +32,7 @@ def test_apply_variant_payload():
     from actions.sale_manager import apply_variant_discount
     client = FakeClient()
     product = {'title': 'Test Product'}
-    variant = {'id': 10, 'sku': 'SKU1', 'price': '100.00', 'compare_at_price': None}
+    variant = {'id': 10, 'sku': 'SKU1', 'price': '100.00', 'compare_at_price': None, 'inventory_quantity': 11}
     result = apply_variant_discount(None, client, product, variant, 20, False)
     assert result == 'updated'
     method, path, kwargs = client.calls[0]
@@ -46,7 +46,7 @@ def test_apply_does_not_stack_discount():
     from actions.sale_manager import apply_variant_discount
     client = FakeClient()
     product = {'title': 'Test Product'}
-    variant = {'id': 10, 'sku': 'SKU1', 'price': '80.00', 'compare_at_price': '100.00'}
+    variant = {'id': 10, 'sku': 'SKU1', 'price': '80.00', 'compare_at_price': '100.00', 'inventory_quantity': 11}
     result = apply_variant_discount(None, client, product, variant, 20, False)
     assert result == 'skipped'
     assert client.calls == []
@@ -56,7 +56,7 @@ def test_restore_variant_payload():
     from actions.sale_manager import restore_variant_price
     client = FakeClient()
     product = {'title': 'Test Product'}
-    variant = {'id': 10, 'sku': 'SKU1', 'price': '80.00', 'compare_at_price': '100.00'}
+    variant = {'id': 10, 'sku': 'SKU1', 'price': '80.00', 'compare_at_price': '100.00', 'inventory_quantity': 1}
     result = restore_variant_price(None, client, product, variant, False)
     assert result == 'updated'
     method, path, kwargs = client.calls[0]
@@ -64,3 +64,24 @@ def test_restore_variant_payload():
     assert path == '/variants/10.json'
     assert kwargs['json']['variant']['price'] == '100.00'
     assert kwargs['json']['variant']['compare_at_price'] is None
+
+
+def test_apply_skips_stock_10_or_less():
+    from actions.sale_manager import apply_variant_discount
+    client = FakeClient()
+    product = {'title': 'Low Stock Product'}
+    for stock in (0, 1, 10):
+        variant = {'id': stock + 100, 'sku': f'SKU{stock}', 'price': '100.00', 'compare_at_price': None, 'inventory_quantity': stock}
+        result = apply_variant_discount(None, client, product, variant, 20, False)
+        assert result == 'stock_skipped'
+    assert client.calls == []
+
+
+def test_apply_allows_stock_above_10():
+    from actions.sale_manager import apply_variant_discount
+    client = FakeClient()
+    product = {'title': 'Stocked Product'}
+    variant = {'id': 111, 'sku': 'SKU11', 'price': '100.00', 'compare_at_price': None, 'inventory_quantity': 11}
+    result = apply_variant_discount(None, client, product, variant, 20, False)
+    assert result == 'updated'
+    assert len(client.calls) == 1

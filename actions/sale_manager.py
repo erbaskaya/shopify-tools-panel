@@ -3,10 +3,20 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from urllib.parse import quote
 
 from core.config import check_config, get_store
-from core.job_manager import finish_job, log
+from core.job_manager import finish_job, log, set_progress
 from core.shopify_client import ShopifyClient
 
 MONEY_STEP = Decimal('0.01')
+MIN_SALE_STOCK = 10
+
+
+
+def variant_stock(variant):
+    try:
+        return int(variant.get('inventory_quantity') or 0)
+    except (TypeError, ValueError):
+        return 0
+
 
 def money(value):
     try:
@@ -83,6 +93,12 @@ def apply_variant_discount(job_id, client, product, variant, discount_percent, d
     current_price = money(variant.get('price'))
     compare_price = money(variant.get('compare_at_price')) if variant.get('compare_at_price') not in (None, '') else None
     sku = variant.get('sku') or '-'
+    stock = variant_stock(variant)
+
+    # Sale indirimi yalnızca stoğu 10'dan büyük varyantlara uygulanır.
+    if stock <= MIN_SALE_STOCK:
+        log(job_id, f'ATLANDI: stok yetersiz ({stock}) | {product.get("title")} | SKU={sku} | gerekli > {MIN_SALE_STOCK}')
+        return 'stock_skipped'
 
     if current_price is None:
         log(job_id, f'ATLANDI: geçersiz fiyat | {product.get("title")} | SKU={sku}')
@@ -106,10 +122,10 @@ def apply_variant_discount(job_id, client, product, variant, discount_percent, d
         }
     }
     if dry_run:
-        log(job_id, f'TEST FİYAT: {product.get("title")} | SKU={sku} | {current_price:.2f} -> {new_price:.2f} | compare={current_price:.2f}')
+        log(job_id, f'TEST FİYAT: {product.get("title")} | SKU={sku} | {current_price:.2f} -> {new_price:.2f} | stok={stock} | compare={current_price:.2f}')
     else:
         client.rest_request('PUT', f'/variants/{variant_id}.json', json=payload)
-        log(job_id, f'FİYAT OK: {product.get("title")} | SKU={sku} | {current_price:.2f} -> {new_price:.2f}')
+        log(job_id, f'FİYAT OK: {product.get("title")} | SKU={sku} | {current_price:.2f} -> {new_price:.2f} | stok={stock}')
     return 'updated'
 
 
@@ -152,10 +168,14 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
         'products': len(products),
         'variant_updated': 0,
         'variant_skipped': 0,
+        'stock_skipped': 0,
         'errors': 0,
     }
 
-    for product in products:
+    total_products = len(products)
+    set_progress(job_id, 0, total_products, store.name)
+    for product_index, product in enumerate(products, start=1):
+        log(job_id, f'ÜRÜN {product_index}/{total_products}: {product.get("title")}')
         try:
             for variant in product.get('variants', []):
                 if operation == 'apply':
@@ -164,13 +184,18 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
                     result = restore_variant_price(job_id, client, product, variant, dry_run)
                 if result == 'updated':
                     stats['variant_updated'] += 1
+                elif result == 'stock_skipped':
+                    stats['stock_skipped'] += 1
+                    stats['variant_skipped'] += 1
                 else:
                     stats['variant_skipped'] += 1
                 time.sleep(0.08)
 
         except Exception as exc:
             stats['errors'] += 1
-            log(job_id, f'HATA ÜRÜN: {product.get("title")} | {exc}')
+            log(job_id, f'HATA ÜRÜN {product_index}/{total_products}: {product.get("title")} | {exc}')
+        finally:
+            set_progress(job_id, product_index, total_products, store.name)
 
     log(
         job_id,
@@ -178,6 +203,7 @@ def process_store(job_id, store_key, operation, discount_percent, filter_mode, f
         f'products={stats["products"]} '
         f'variant_updated={stats["variant_updated"]} '
         f'variant_skipped={stats["variant_skipped"]} '
+        f'stock_skipped={stats["stock_skipped"]} '
         f'errors={stats["errors"]}',
     )
     return stats
