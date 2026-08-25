@@ -135,3 +135,65 @@ vendor
 ## Yeni işlem ekleme
 
 Yeni işlem kodunu `actions/` klasörüne ayrı dosya olarak ekle. Sonra `main.py` içine yeni form ve route ekle.
+
+## Sale / İndirim Yönetimi
+
+Yeni `/sale` sayfası ile ürünleri üç şekilde seçebilirsin:
+
+- Kategoriye göre
+- Vendor / marka adına göre
+- Tek tek ürün seçerek
+
+İşlem uygulanacak mağazalar checkbox ile seçilebilir. Birden fazla mağaza için `SHOPIFY_STORES_JSON` kullanılır.
+
+### İndirim uygulama
+
+Örnek: satış fiyatı `100.00`, indirim `%20`:
+
+```text
+price = 80.00
+compare_at_price = 100.00
+```
+
+Ürün ayrıca `/collections/sale` kategorisine eklenir. `sale` kategorisi manuel/custom collection olmalıdır.
+
+Zaten `compare_at_price` değeri bulunan varyantlara ikinci kez indirim bindirilmez.
+
+### İndirimi geri alma
+
+Seçilen ürünlerde:
+
+```text
+price = compare_at_price
+compare_at_price = boş
+```
+
+ve ürün `/collections/sale` kategorisinden çıkarılır.
+
+### Çoklu mağaza ayarı
+
+Environment Variable örneği:
+
+```text
+SHOPIFY_STORES_JSON=[{"key":"store1","name":"Store 1","domain":"store1.myshopify.com","token":"shpat_xxx","api_version":"2026-04"},{"key":"store2","name":"Store 2","domain":"store2.myshopify.com","token":"shpat_yyy","api_version":"2026-04"}]
+```
+
+Tokenlar tarayıcıya gönderilmez; yalnızca sunucu tarafında Environment Variable olarak tutulur.
+
+## Windows EXE
+
+Bu repo ve masaüstü sürümü artık aynı `main.py` ve `actions/` kodunu kullanır.
+
+Windows'ta EXE üretmek için:
+
+```text
+build_windows.bat
+```
+
+Çıktı:
+
+```text
+dist\ShopifyToolsPanel.exe
+```
+
+Yerel kullanımda `.env` dosyası `.env.example` üzerinden hazırlanabilir. `python-dotenv` ile otomatik okunur.
