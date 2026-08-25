@@ -201,3 +201,12 @@ Yerel kullanımda `.env` dosyası `.env.example` üzerinden hazırlanabilir. `py
 ## Modern Sidebar UI
 
 Panel arayuzu profesyonel yonetim paneli duzenine gecirildi: solda sabit navigasyon, sagda icerik alani, dashboard KPI kartlari, modern formlar ve Sale workflow ekrani. Bu degisiklik islevsel endpointleri degistirmez.
+
+## Mağaza Yönetimi
+
+Sol menüdeki **Mağaza Yönetimi** sayfasından Shopify mağazaları eklenebilir, düzenlenebilir, bağlantısı test edilebilir ve silinebilir.
+
+- EXE / local kullanımda kayıtlar `data/stores.json` içinde şifreli token ile saklanır.
+- Vercel üzerinde dosya sistemi kalıcı olmadığı için `DATABASE_URL` tanımlanmalıdır. PostgreSQL/Neon bağlantısı varsa tablo otomatik oluşturulur.
+- Mevcut `SHOPIFY_STORES_JSON` mağazaları sayfadaki **ENV Mağazalarını İçe Aktar** butonuyla panel yönetimine taşınabilir.
+- Taşıma tamamlandıktan sonra `SHOPIFY_STORES_JSON` Vercel Environment Variables içinden kaldırılabilir.

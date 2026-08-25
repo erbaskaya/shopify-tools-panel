@@ -4,3 +4,6 @@ requests
 python-multipart
 openpyxl
 python-dotenv
+
+cryptography>=42
+psycopg[binary]>=3.2

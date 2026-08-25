@@ -1,14 +1,16 @@
 from pathlib import Path
 from typing import List
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, PlainTextResponse
 
 from core.auth import clear_login_cookie, is_logged_in, set_login_cookie
-from core.config import check_config, get_store, get_stores, settings
+from core.config import check_config, get_store, get_stores, get_env_stores, settings
 from core.file_utils import save_upload_file
 from core.job_manager import create_job, get_job, list_jobs, run_thread
 from core.shopify_client import ShopifyClient
+from core.store_repository import backend_name, writes_are_persistent, get_managed_store, upsert_managed_store, delete_managed_store
 from actions.stock_update import run as run_stock_update
 from actions.category_sync import run as run_category_sync
 from actions.product_import import run as run_product_import
@@ -44,6 +46,7 @@ def layout(title, body, request=None, refresh=None):
 
     dashboard_icon = '''<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg>'''
     sale_icon = '''<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.1 11 3.5A2 2 0 0 0 9.6 3H5a2 2 0 0 0-2 2v4.6A2 2 0 0 0 3.6 11l9.5 9.5a2 2 0 0 0 2.8 0l4.7-4.6a2 2 0 0 0 0-2.8ZM7 8.5A1.5 1.5 0 1 1 7 5a1.5 1.5 0 0 1 0 3.5Z"/></svg>'''
+    stores_icon = '''<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16l-1-3H5L4 7Zm1 2v10h14V9M8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'''
     tools_icon = '''<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a5 5 0 0 0-6.3 6.3L3 18l3 3 5.4-5.4a5 5 0 0 0 6.3-6.3l-3 3-3-3 3-3Z"/></svg>'''
     import_icon = '''<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 16v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'''
     history_icon = '''<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 4v5h5M5.5 16a8 8 0 1 0 .3-8.4L4 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'''
@@ -52,6 +55,7 @@ def layout(title, body, request=None, refresh=None):
     if logged_in:
         dashboard_active = path == '/dashboard' or path.startswith('/jobs/')
         sale_active = path == '/sale'
+        stores_active = path.startswith('/stores')
         sidebar = f'''<aside class="sidebar">
             <div class="side-brand">
                 <div class="brand-mark">S</div>
@@ -62,6 +66,7 @@ def layout(title, body, request=None, refresh=None):
                 {nav_link('/dashboard', 'Dashboard', dashboard_icon, dashboard_active)}
                 <div class="nav-label">TİCARET</div>
                 {nav_link('/sale', 'Sale Yönetimi', sale_icon, sale_active)}
+                {nav_link('/stores', 'Mağaza Yönetimi', stores_icon, stores_active)}
                 <div class="nav-label">ARAÇLAR</div>
                 {nav_link('/dashboard#quick-tools', 'Hızlı Araçlar', tools_icon)}
                 {nav_link('/dashboard#import-export', 'Import / Export', import_icon)}
@@ -189,6 +194,161 @@ def dashboard(request: Request):
 
     return layout('Dashboard', body, request)
 
+
+def _store_mask(token):
+    token = str(token or '')
+    if len(token) <= 8:
+        return '••••••••'
+    return token[:4] + '••••••••••••' + token[-4:]
+
+
+@app.get('/stores', response_class=HTMLResponse)
+def stores_page(request: Request, edit: str = '', msg: str = '', error: str = ''):
+    red = require_login(request)
+    if red:
+        return red
+
+    stores = get_stores()
+    managed = get_managed_store(edit) if edit else None
+    env_stores = get_env_stores()
+    persistent = writes_are_persistent()
+    storage = backend_name()
+
+    rows = []
+    for store in stores:
+        source = getattr(store, 'source', 'env')
+        source_badge = '<span class="pill status-done">Panel</span>' if source == 'panel' else '<span class="pill">ENV</span>'
+        if source == 'panel':
+            actions = f'''<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+                <a class="btn btn-light btn-inline" href="/stores?edit={e(store.key)}">Düzenle</a>
+                <form method="post" action="/stores/{e(store.key)}/test"><button class="btn btn-light btn-inline" type="submit">Bağlantı Testi</button></form>
+                <form method="post" action="/stores/{e(store.key)}/delete" onsubmit="return confirm('Bu mağaza panelden silinsin mi?')"><button class="btn btn-danger btn-inline" type="submit">Sil</button></form>
+            </div>'''
+        else:
+            actions = '<span class="muted small">Environment Variable üzerinden tanımlı</span>'
+        rows.append(f'''<div class="store-manage-row">
+            <div><div class="product-title">{e(store.name)}</div><div class="muted small">{e(store.domain)}</div></div>
+            <div><code>{e(store.key)}</code></div>
+            <div>{source_badge}</div>
+            <div class="muted small">{e(store.api_version)}</div>
+            <div>{actions}</div>
+        </div>''')
+    store_rows = ''.join(rows) or '<div class="hint">Henüz mağaza tanımlı değil.</div>'
+
+    if managed:
+        form_title = 'Mağazayı Düzenle'
+        key_value = managed.get('key', '')
+        name_value = managed.get('name', '')
+        domain_value = managed.get('domain', '')
+        api_value = managed.get('api_version', '2026-04')
+        token_hint = f'Mevcut token: {_store_mask(managed.get("token"))}. Değiştirmeyecekseniz boş bırakın.'
+        token_required = ''
+    else:
+        form_title = 'Yeni Mağaza Ekle'
+        key_value = name_value = domain_value = ''
+        api_value = '2026-04'
+        token_hint = 'Shopify Admin API access token (shpat_...)'
+        token_required = 'required'
+
+    write_warning = ''
+    form_disabled = ''
+    if not persistent:
+        form_disabled = 'disabled'
+        write_warning = '''<div class="alert"><b>Kalıcı depolama gerekli:</b> Vercel dosya sistemi geçicidir. Panelden mağaza ekleme/düzenleme için Vercel projesine bir PostgreSQL veritabanı bağlayıp <b>DATABASE_URL</b> Environment Variable oluşturmalıyız. Mevcut ENV mağazaları çalışmaya devam eder.</div>'''
+
+    import_env = ''
+    if env_stores:
+        disabled = 'disabled' if not persistent else ''
+        import_env = f'''<div class="card" style="margin-top:12px"><div class="card-header"><div><h2>ENV Mağazalarını Panele Taşı</h2><p>Mevcut SHOPIFY_STORES_JSON içindeki {len(env_stores)} mağazayı yönetilebilir mağaza kayıtlarına kopyalar.</p></div><span class="card-icon">⇢</span></div>
+        <form method="post" action="/stores/import-env"><button {disabled}>ENV Mağazalarını İçe Aktar</button></form>
+        <p class="small muted">Aktarım başarılı olduktan sonra Vercel'deki SHOPIFY_STORES_JSON değişkenini kaldırabilirsiniz.</p></div>'''
+
+    status_msg = f'<div class="alert ok">{e(msg)}</div>' if msg else ''
+    error_msg = f'<div class="alert">{e(error)}</div>' if error else ''
+    cancel = '<a class="btn btn-light btn-inline" href="/stores">Vazgeç</a>' if managed else ''
+
+    body = f'''
+<style>
+.store-manage-grid{{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:14px;align-items:start}}
+.store-manage-row{{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(100px,.7fr) 70px 90px minmax(210px,1fr);gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}}
+.store-manage-row:last-child{{border-bottom:0}}code{{font-size:12px;background:#f4f4f5;padding:4px 7px;border-radius:7px}}.token-note{{font-size:12px;color:var(--muted);margin-top:6px}}
+@media(max-width:1050px){{.store-manage-grid{{grid-template-columns:1fr}}.store-manage-row{{grid-template-columns:1fr 1fr;align-items:start}}}}
+</style>
+<div class="page-heading"><div><span class="eyebrow">AYARLAR</span><h1>Mağaza Yönetimi</h1><p>Shopify mağazalarını panelden ekleyin, düzenleyin, test edin ve silin.</p></div><span class="pill status-done">Depolama: {e(storage)}</span></div>
+{status_msg}{error_msg}{write_warning}
+<div class="store-manage-grid">
+  <div>
+    <div class="card"><div class="card-header"><div><h2>Bağlı Mağazalar</h2><p>Sale ve diğer çoklu mağaza işlemlerinde bu liste kullanılır.</p></div><span class="card-icon">{len(stores)}</span></div>{store_rows}</div>
+    {import_env}
+  </div>
+  <div class="card"><div class="card-header"><div><h2>{form_title}</h2><p>Token tarayıcıya geri gösterilmez ve panel kayıtlarında şifreli saklanır.</p></div><span class="card-icon">＋</span></div>
+    <form method="post" action="/stores/save">
+      <label>Mağaza adı</label><input type="text" name="name" value="{e(name_value)}" placeholder="HAUSONE" required {form_disabled}>
+      <label>Mağaza anahtarı</label><input type="text" name="store_key" value="{e(key_value)}" placeholder="hausone" {'readonly' if managed else ''} required {form_disabled}><div class="token-note">Kısa ve benzersiz olmalı. Örn: hausone, frank-eiselt.</div>
+      <label>Shopify domain</label><input type="text" name="domain" value="{e(domain_value)}" placeholder="xxxxx.myshopify.com" required {form_disabled}>
+      <label>Admin API Access Token</label><input type="password" name="token" placeholder="{e(token_hint)}" {token_required} {form_disabled}><div class="token-note">{e(token_hint)}</div>
+      <label>API version</label><input type="text" name="api_version" value="{e(api_value)}" placeholder="2026-04" required {form_disabled}>
+      <button type="submit" {form_disabled}>Kaydet</button>{cancel}
+    </form>
+  </div>
+</div>'''
+    return layout('Mağaza Yönetimi', body, request)
+
+
+@app.post('/stores/save')
+def stores_save(request: Request, name: str = Form(...), store_key: str = Form(...), domain: str = Form(...), token: str = Form(''), api_version: str = Form('2026-04')):
+    red = require_login(request)
+    if red:
+        return red
+    try:
+        upsert_managed_store(store_key, name, domain, token, api_version, True)
+        return RedirectResponse('/stores?msg=Mağaza kaydedildi.', status_code=303)
+    except Exception as exc:
+        return RedirectResponse('/stores?error=' + quote(str(exc)), status_code=303)
+
+
+@app.post('/stores/{store_key}/delete')
+def stores_delete(store_key: str, request: Request):
+    red = require_login(request)
+    if red:
+        return red
+    try:
+        delete_managed_store(store_key)
+        return RedirectResponse('/stores?msg=Mağaza silindi.', status_code=303)
+    except Exception as exc:
+        return RedirectResponse('/stores?error=' + quote(str(exc)), status_code=303)
+
+
+@app.post('/stores/{store_key}/test')
+def stores_test(store_key: str, request: Request):
+    red = require_login(request)
+    if red:
+        return red
+    try:
+        store = get_store(store_key)
+        if not store:
+            raise Exception('Mağaza bulunamadı.')
+        client = ShopifyClient(store=store)
+        data = client.gql('query { shop { name myshopifyDomain } }')
+        shop = data.get('shop') or {}
+        msg = f'Bağlantı başarılı: {shop.get("name") or store.name} ({shop.get("myshopifyDomain") or store.domain})'
+        return RedirectResponse('/stores?msg=' + quote(msg), status_code=303)
+    except Exception as exc:
+        return RedirectResponse('/stores?error=' + quote('Bağlantı başarısız: ' + str(exc)), status_code=303)
+
+
+@app.post('/stores/import-env')
+def stores_import_env(request: Request):
+    red = require_login(request)
+    if red:
+        return red
+    try:
+        items = get_env_stores()
+        for store in items:
+            upsert_managed_store(store.key, store.name, store.domain, store.token, store.api_version, True)
+        return RedirectResponse('/stores?msg=' + quote(f'{len(items)} mağaza panele aktarıldı.'), status_code=303)
+    except Exception as exc:
+        return RedirectResponse('/stores?error=' + quote(str(exc)), status_code=303)
 
 def _sale_reference_data(store_key, product_q):
     store = get_store(store_key)
